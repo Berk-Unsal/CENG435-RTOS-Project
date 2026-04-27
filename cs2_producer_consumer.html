@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS2: RTOS Queue Analytics</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --panel-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #6c757d;
+            --accent-purple: #6a5acd;
+            --accent-green: #8bc34a;
+            --accent-blue: #1976d2;
+            --accent-teal: #26a69a;
+            --alert-red: #dc3545;
+            --border-color: #e9ecef;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+            .header h1 {
+                margin: 0;
+                color: var(--text-main);
+                font-size: 1.8rem;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background-color: var(--panel-bg);
+            color: var(--text-muted);
+            border: 1px solid #ced4da;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            min-width: 100px;
+            text-align: center;
+        }
+
+            button:hover {
+                background-color: #f8f9fa;
+                color: var(--text-main);
+                border-color: #adb5bd;
+            }
+
+            button.active {
+                background-color: var(--accent-purple);
+                color: white;
+                border-color: var(--accent-purple);
+            }
+
+        .btn-action {
+            font-weight: bold;
+        }
+
+            /* Oynatma Durumu Buton Stilleri */
+            .btn-action.pause-btn {
+                color: var(--alert-red);
+                border-color: #f5c6cb;
+                background-color: #f8d7da;
+            }
+
+                .btn-action.pause-btn:hover {
+                    background-color: #f1b0b7;
+                }
+
+            .btn-action.play-btn {
+                color: #155724;
+                border-color: #c3e6cb;
+                background-color: #d4edda;
+                animation: gentlePulse 2s infinite;
+            }
+
+                .btn-action.play-btn:hover {
+                    background-color: #c3e6cb;
+                }
+
+        @keyframes gentlePulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 6px rgba(40, 167, 69, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+            }
+        }
+
+        .btn-action.restart {
+            color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+            .btn-action.restart:hover {
+                background-color: #e3f2fd;
+            }
+
+        .divider {
+            height: 30px;
+            width: 1px;
+            background-color: #ced4da;
+            margin: 0 5px;
+        }
+
+        .system-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 24px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+            .panel h3 {
+                margin-top: 0;
+                color: var(--text-main);
+                font-weight: 600;
+                font-size: 1.1rem;
+                border-bottom: 1px solid var(--border-color);
+                padding-bottom: 12px;
+                margin-bottom: 20px;
+            }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .bg-running {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .bg-blocked {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .bg-standby {
+            background-color: #e2e8f0;
+            color: #4a5568;
+            border: 1px solid #cbd5e0;
+        }
+
+        .kpi-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .kpi-title {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .kpi-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+            .kpi-value.err {
+                color: var(--alert-red);
+            }
+
+        /* Queue Visuals */
+        .queue-wrapper {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        .q-slot {
+            width: 50px;
+            height: 50px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: transparent;
+            transition: all 0.2s;
+        }
+
+            .q-slot.filled {
+                background-color: var(--accent-purple);
+                color: white;
+                border-color: #5e4ec0;
+                box-shadow: 0 4px 6px rgba(106, 90, 205, 0.2);
+            }
+
+        /* Terminal/Log */
+        .terminal {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            height: 180px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8rem;
+            border: 1px solid var(--border-color);
+            color: #495057;
+        }
+
+        .t-prod {
+            color: var(--accent-blue);
+        }
+
+        .t-cons {
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+
+        .t-sys {
+            color: var(--accent-purple);
+        }
+
+        .t-err {
+            color: var(--alert-red);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>RTOS System Health</h1>
+        <div class="controls">
+            <button id="btnDrop" class="active" onclick="setMode('drop')">2.a: Drop</button>
+            <button id="btnBlock" onclick="setMode('block')">2.b: Block (RTOS)</button>
+            <button id="btnOverwrite" onclick="setMode('overwrite')">2.c: Overwrite</button>
+            <div class="divider"></div>
+            <button id="btnTogglePlay" class="btn-action play-btn" onclick="togglePlayState()">START</button>
+            <button class="btn-action restart" onclick="restartSim()">Restart</button>
+        </div>
+    </div>
+
+    <div class="system-grid">
+        <div class="panel">
+            <h3>Producer Subsystem</h3>
+            <div id="pStatus" class="status-badge bg-standby">STANDBY</div>
+
+            <div class="kpi-box">
+                <div class="kpi-title">Execution Rate</div>
+                <div class="kpi-value" style="color: var(--accent-blue);">100ms</div>
+            </div>
+            <div class="kpi-box">
+                <div class="kpi-title">Packets Generated</div>
+                <div class="kpi-value" id="pCount">0</div>
+            </div>
+            <div class="kpi-box" style="border: none;">
+                <div class="kpi-title">Packets Dropped</div>
+                <div class="kpi-value err" id="dCount">0</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Message Queue Capacity</h3>
+
+            <div class="queue-wrapper" id="queueSlots"></div>
+
+            <div class="terminal" id="sysLog">
+                <div class="t-sys">>>> OS Scheduler initialized. SYSTEM PAUSED.</div>
+                <div class="t-sys">>>> Waiting for START command...</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Consumer Subsystem</h3>
+            <div id="cStatus" class="status-badge bg-standby">STANDBY</div>
+
+            <div class="kpi-box">
+                <div class="kpi-title">Execution Rate</div>
+                <div class="kpi-value" style="color: var(--accent-teal);">500ms</div>
+            </div>
+            <div class="kpi-box" style="border: none;">
+                <div class="kpi-title">Packets Processed</div>
+                <div class="kpi-value" id="cCount">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MAX_CAP = 5;
+        let mode = 'drop';
+        // Sistem art�k do�rudan PAUSED olarak ba�l�yor
+        let isPaused = true;
+
+        let q = [];
+        let stats = { p: 0, c: 0, d: 0, id: 1 };
+        let state = { pBlock: false, cBlock: false };
+
+        function log(msg, type) {
+            const el = document.getElementById('sysLog');
+            let cls = type === 'p' ? 't-prod' : type === 'c' ? 't-cons' : type === 'e' ? 't-err' : 't-sys';
+            const time = new Date().toISOString().substring(11, 23);
+            el.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function drawUI() {
+            document.getElementById('pCount').innerText = stats.p;
+            document.getElementById('cCount').innerText = stats.c;
+            document.getElementById('dCount').innerText = stats.d;
+
+            const slots = document.getElementById('queueSlots');
+            slots.innerHTML = '';
+            for (let i = 0; i < MAX_CAP; i++) {
+                if (i < q.length) slots.innerHTML += `<div class="q-slot filled">D${q[i]}</div>`;
+                else slots.innerHTML += `<div class="q-slot"></div>`;
+            }
+
+            // Durum badge'leri: E�er sistem paused ise ve hen�z hi� �al��mam��sa STANDBY, �al���yorsa RUNNING veya BLOCKED
+            if (isPaused && stats.p === 0) {
+                document.getElementById('pStatus').className = 'status-badge bg-standby';
+                document.getElementById('pStatus').innerText = 'STANDBY';
+                document.getElementById('cStatus').className = 'status-badge bg-standby';
+                document.getElementById('cStatus').innerText = 'STANDBY';
+            } else {
+                document.getElementById('pStatus').className = state.pBlock ? 'status-badge bg-blocked' : 'status-badge bg-running';
+                document.getElementById('pStatus').innerText = state.pBlock ? 'BLOCKED' : 'RUNNING';
+
+                document.getElementById('cStatus').className = state.cBlock ? 'status-badge bg-blocked' : 'status-badge bg-running';
+                document.getElementById('cStatus').innerText = state.cBlock ? 'BLOCKED' : 'RUNNING';
+            }
+        }
+
+        function restartSim() {
+            q = []; stats = { p: 0, c: 0, d: 0, id: 1 }; state = { pBlock: false, cBlock: false };
+
+            // Restart yap�ld���nda sistem durur ve START butonuna d�ner
+            isPaused = true;
+            const toggleBtn = document.getElementById('btnTogglePlay');
+            toggleBtn.innerText = 'START';
+            toggleBtn.className = 'btn-action play-btn';
+
+            document.getElementById('sysLog').innerHTML = '';
+            log(`System RESTARTED in ${mode.toUpperCase()} mode. SYSTEM PAUSED.`, 'sys');
+            log(`>>> Waiting for START command...`, 'sys');
+            drawUI();
+        }
+
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.controls button:not(.btn-action)').forEach(b => b.classList.remove('active'));
+            if (m === 'drop') document.getElementById('btnDrop').classList.add('active');
+            if (m === 'block') document.getElementById('btnBlock').classList.add('active');
+            if (m === 'overwrite') document.getElementById('btnOverwrite').classList.add('active');
+            restartSim();
+        }
+
+        function togglePlayState() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('btnTogglePlay');
+            if (isPaused) {
+                // Pause'a bas�ld�ysa buton tekrar RESUME (veya START) olur
+                btn.innerText = 'RESUME';
+                btn.className = 'btn-action play-btn';
+                log('System PAUSED by user.', 'sys');
+            } else {
+                // Play'e bas�ld�ysa buton PAUSE olur
+                btn.innerText = 'PAUSE';
+                btn.className = 'btn-action pause-btn';
+                log('System RUNNING.', 'sys');
+            }
+            drawUI(); // Stat�leri g�ncelle
+        }
+
+        setInterval(() => {
+            if (isPaused) return;
+
+            if (mode === 'block' && q.length >= MAX_CAP) {
+                if (!state.pBlock) { state.pBlock = true; log(`Producer BLOCKED by OS (Full)`, 'e'); }
+                drawUI(); return;
+            }
+
+            if (state.pBlock) { state.pBlock = false; log(`Producer UNBLOCKED`, 'p'); }
+
+            let data = stats.id++;
+            stats.p++;
+
+            if (q.length < MAX_CAP) {
+                q.push(data); log(`Pushed [D${data}]`, 'p');
+            } else {
+                if (mode === 'drop') {
+                    stats.d++; log(`DROP: [D${data}] discarded!`, 'e');
+                } else if (mode === 'overwrite') {
+                    let old = q.shift(); q.push(data);
+                    log(`OVERWRITE: [D${old}] dropped, [D${data}] saved`, 'sys');
+                }
+            }
+            drawUI();
+        }, 100);
+
+        setInterval(() => {
+            if (isPaused) return;
+
+            if (mode === 'block' && q.length === 0) {
+                if (!state.cBlock) { state.cBlock = true; log(`Consumer BLOCKED by OS (Empty)`, 'e'); }
+                drawUI(); return;
+            }
+
+            if (state.cBlock) { state.cBlock = false; log(`Consumer UNBLOCKED`, 'c'); }
+
+            if (q.length > 0) {
+                let data = q.shift(); stats.c++;
+                log(`Popped [D${data}]`, 'c');
+            }
+            drawUI();
+        }, 500);
+
+        drawUI();
+    </script>
+</body>
+</html>
