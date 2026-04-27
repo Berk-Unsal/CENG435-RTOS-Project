@@ -1,0 +1,595 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS3: Priority Inversion & PIP</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --panel-bg: #ffffff;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --high-prio: #e53e3e;
+            --med-prio: #dd6b20;
+            --low-prio: #3182ce;
+            --mutex-color: #805ad5;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+            .header h1 {
+                margin: 0;
+                font-size: 1.6rem;
+                font-weight: 600;
+            }
+
+            .header p {
+                margin: 5px 0 0 0;
+                color: var(--text-muted);
+                font-size: 0.9rem;
+            }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            color: white;
+        }
+
+        .btn-step {
+            background-color: #2b6cb0;
+        }
+
+            .btn-step:hover {
+                background-color: #2c5282;
+            }
+
+        .btn-reset {
+            background-color: #718096;
+        }
+
+            .btn-reset:hover {
+                background-color: #4a5568;
+            }
+
+        .btn-pip {
+            background-color: #38a169;
+        }
+
+            .btn-pip:hover {
+                background-color: #2f855a;
+            }
+
+        .alert-box {
+            display: none;
+            width: 100%;
+            max-width: 1160px;
+            box-sizing: border-box;
+            background-color: #fff5f5;
+            border: 1px solid #e53e3e;
+            color: #c53030;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 25px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(229, 62, 62, 0.1);
+        }
+
+        .success-box {
+            display: none;
+            width: 100%;
+            max-width: 1160px;
+            box-sizing: border-box;
+            background-color: #f0fff4;
+            border: 1px solid #38a169;
+            color: #22543d;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 25px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(56, 161, 105, 0.1);
+        }
+
+        .alert-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
+
+        .alert-sub {
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-top: 5px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            border-radius: 6px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+            .card h3 {
+                margin: 0 0 15px 0;
+                padding-bottom: 10px;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                justify-content: space-between;
+                font-size: 1rem;
+                align-items: center;
+            }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: white;
+            letter-spacing: 0.5px;
+        }
+
+        .bg-high {
+            background-color: var(--high-prio);
+        }
+
+        .bg-med {
+            background-color: var(--med-prio);
+        }
+
+        .bg-low {
+            background-color: var(--low-prio);
+            transition: background-color 0.3s;
+        }
+
+        .bg-elevated {
+            background-color: var(--high-prio);
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--high-prio);
+        }
+
+        .status {
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-align: center;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            background-color: #f7fafc;
+            border: 1px solid var(--border-color);
+        }
+
+        .state-running {
+            background-color: #c6f6d5;
+            color: #22543d;
+            border-color: #9ae6b4;
+        }
+
+        .state-ready {
+            background-color: #ebf8ff;
+            color: #2b6cb0;
+            border-color: #bee3f8;
+        }
+
+        .state-blocked {
+            background-color: #fed7d7;
+            color: #9b2c2c;
+            border-color: #feb2b2;
+        }
+
+        .state-idle {
+            background-color: #edf2f7;
+            color: #4a5568;
+            border-color: #e2e8f0;
+        }
+
+        .dependency {
+            font-size: 0.8rem;
+            color: #4a5568;
+            font-family: monospace;
+            background: #edf2f7;
+            padding: 5px 8px;
+            border-radius: 4px;
+        }
+
+        .dep-active {
+            border-left: 3px solid var(--mutex-color);
+        }
+
+        .dep-none {
+            border-left: 3px solid #cbd5e0;
+            color: #a0aec0;
+        }
+
+        .mutex-panel {
+            width: 100%;
+            max-width: 1160px;
+            background: var(--panel-bg);
+            box-sizing: border-box;
+            border-radius: 6px;
+            padding: 15px 20px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .mutex-panel h3 {
+                margin: 0;
+                color: #4a5568;
+                font-size: 1rem;
+            }
+
+        .mutex-status {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--mutex-color);
+            font-family: monospace;
+            background: #faf5ff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #e9d8fd;
+        }
+
+        .mutex-locked {
+            color: #c53030;
+            background: #fff5f5;
+            border-color: #fed7d7;
+        }
+
+        .terminal {
+            width: 100%;
+            max-width: 1160px;
+            background-color: #1a202c;
+            box-sizing: border-box;
+            border-radius: 6px;
+            padding: 20px;
+            height: 250px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            color: #a0aec0;
+            border: 1px solid #2d3748;
+        }
+
+        .log-time {
+            color: #718096;
+            margin-right: 15px;
+        }
+
+        .log-tag {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .tag-sched {
+            color: #63b3ed;
+        }
+
+        .tag-mutex {
+            color: #b794f4;
+        }
+
+        .tag-warn {
+            color: #fbd38d;
+        }
+
+        .tag-err {
+            color: #fc8181;
+        }
+
+        .tag-pip {
+            color: #9ae6b4;
+        }
+
+        .log-high {
+            color: #fc8181;
+        }
+
+        .log-med {
+            color: #fbd38d;
+        }
+
+        .log-low {
+            color: #9ae6b4;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Priority Inversion</h1>
+            <p>Unbounded Priority Inversion vs. Priority Inheritance Protocol (PIP)</p>
+        </div>
+        <div class="controls">
+            <button class="btn-pip" id="btnPip" onclick="togglePIP()">PIP Patch: OFF</button>
+            <button class="btn-step" id="btnStep" onclick="nextStep()">Step Forward</button>
+            <button class="btn-reset" onclick="resetSim()">Reset</button>
+        </div>
+    </div>
+
+    <div class="alert-box" id="inversionAlert">
+        <div class="alert-title">CRITICAL EXCEPTION: PRIORITY INVERSION DETECTED</div>
+        <div class="alert-sub" style="color:#9b2c2c;">Kernel Log: High-priority thread starved. Medium-priority execution is blocking low-priority mutex release.</div>
+    </div>
+
+    <div class="success-box" id="pipSuccess">
+        <div class="alert-title">SYSTEM SECURE: PIP INTERVENTION SUCCESSFUL</div>
+        <div class="alert-sub" style="color:#22543d;">Kernel Log: Task 3 priority temporarily elevated. Medium-priority preemption denied. Mutex safely released.</div>
+    </div>
+
+    <div class="mutex-panel">
+        <h3>Shared Memory Bus</h3>
+        <div class="mutex-status" id="mutexStatus">STATE: 0x00 (UNLOCKED)</div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>Task 1 <span class="badge bg-high">PRIO: HIGH</span></h3>
+            <div class="status state-idle" id="st-high">IDLE</div>
+            <div class="dependency dep-active">Mutex Dependency: ACTIVE</div>
+        </div>
+
+        <div class="card">
+            <h3>Task 2 <span class="badge bg-med">PRIO: MED</span></h3>
+            <div class="status state-idle" id="st-med">IDLE</div>
+            <div class="dependency dep-none">Mutex Dependency: NONE</div>
+        </div>
+
+        <div class="card">
+            <h3>Task 3 <span class="badge bg-low" id="badge-low">PRIO: LOW</span></h3>
+            <div class="status state-idle" id="st-low">IDLE</div>
+            <div class="dependency dep-active">Mutex Dependency: ACTIVE</div>
+        </div>
+    </div>
+
+    <div class="terminal" id="sysLog">
+        <div><span class="log-time">[0.000s]</span><span class="log-tag tag-sched">[KERNEL]</span> System initialized. Awaiting clock interrupts.</div>
+    </div>
+
+    <script>
+        let tick = 0;
+        let mutexOwner = null;
+        let pipEnabled = false;
+
+        function log(tag, tagCls, msg, msgCls = '') {
+            const el = document.getElementById('sysLog');
+            const timeStr = `[0.00${tick}s]`;
+            el.innerHTML += `<div><span class="log-time">${timeStr}</span><span class="log-tag ${tagCls}">${tag}</span> <span class="${msgCls}">${msg}</span></div>`;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function togglePIP() {
+            pipEnabled = !pipEnabled;
+            const btn = document.getElementById('btnPip');
+            if (pipEnabled) {
+                btn.innerText = "PIP Patch: ON";
+                btn.style.backgroundColor = "#e53e3e"; // Red to show it's active/patched
+            } else {
+                btn.innerText = "PIP Patch: OFF";
+                btn.style.backgroundColor = "#38a169";
+            }
+            resetSim();
+            log('[CONFIG]', 'tag-warn', `Priority Inheritance Protocol (PIP) is now ${pipEnabled ? 'ENABLED' : 'DISABLED'}.`);
+        }
+
+        function updateUI(high, med, low, mutex) {
+            const hEl = document.getElementById('st-high');
+            const mEl = document.getElementById('st-med');
+            const lEl = document.getElementById('st-low');
+            const mutEl = document.getElementById('mutexStatus');
+
+            hEl.className = `status state-${high.toLowerCase()}`; hEl.innerText = high;
+            mEl.className = `status state-${med.toLowerCase()}`; mEl.innerText = med;
+            lEl.className = `status state-${low.toLowerCase()}`; lEl.innerText = low;
+
+            if (mutex) {
+                mutEl.innerText = `STATE: 0x01 (LOCKED BY ${mutex})`;
+                mutEl.classList.add('mutex-locked');
+            } else {
+                mutEl.innerText = `STATE: 0x00 (UNLOCKED)`;
+                mutEl.classList.remove('mutex-locked');
+            }
+        }
+
+        function resetSim() {
+            tick = 0; mutexOwner = null;
+            document.getElementById('sysLog').innerHTML = `<div><span class="log-time">[0.000s]</span><span class="log-tag tag-sched">[KERNEL]</span> System initialized. Awaiting clock interrupts.</div>`;
+            document.getElementById('inversionAlert').style.display = 'none';
+            document.getElementById('pipSuccess').style.display = 'none';
+            document.getElementById('btnStep').disabled = false;
+
+            // Reset Badge
+            const lowBadge = document.getElementById('badge-low');
+            lowBadge.className = 'badge bg-low';
+            lowBadge.innerText = 'PRIO: LOW';
+
+            updateUI('IDLE', 'IDLE', 'IDLE', null);
+        }
+
+        function nextStep() {
+            tick++;
+
+            // ---------------- PIP ENABLED SCENARIO ----------------
+            if (pipEnabled) {
+                switch (tick) {
+                    case 1:
+                        log('[SCHED]', 'tag-sched', 'Dispatching Task 3 (Low).', 'log-low');
+                        updateUI('IDLE', 'IDLE', 'RUNNING', null);
+                        break;
+                    case 2:
+                        mutexOwner = 'TASK_3';
+                        log('[MUTEX]', 'tag-mutex', 'Task 3 acquired Shared_Memory_Bus lock.', 'log-low');
+                        updateUI('IDLE', 'IDLE', 'RUNNING', mutexOwner);
+                        break;
+                    case 3:
+                        log('[SCHED]', 'tag-sched', 'Interrupt: Task 1 (High) arrived. Preempting Task 3.', 'log-high');
+                        updateUI('RUNNING', 'IDLE', 'READY', mutexOwner);
+                        break;
+                    case 4:
+                        log('[MUTEX]', 'tag-mutex', 'Task 1 requested Shared_Memory_Bus. Lock denied (held by Task 3).');
+                        log('[SCHED]', 'tag-sched', 'Task 1 state transition -> BLOCKED.', 'log-high');
+
+                        // PIP MAGIC HAPPENS HERE
+                        log('[PIP]', 'tag-pip', 'Initiating Priority Inheritance Protocol...');
+                        log('[PIP]', 'tag-pip', 'Task 3 inherits HIGH priority from blocked Task 1.', 'log-low');
+
+                        const lowBadge = document.getElementById('badge-low');
+                        lowBadge.className = 'badge bg-elevated';
+                        lowBadge.innerText = 'PRIO: ELEVATED (HIGH)';
+
+                        updateUI('BLOCKED', 'IDLE', 'RUNNING', mutexOwner);
+                        break;
+                    case 5:
+                        log('[SCHED]', 'tag-sched', 'Interrupt: Task 2 (Med) arrived.', 'log-med');
+                        log('[SCHED]', 'tag-sched', 'Preemption DENIED. Task 3 is currently running at HIGH priority.', 'log-low');
+                        document.getElementById('pipSuccess').style.display = 'block';
+                        updateUI('BLOCKED', 'READY', 'RUNNING', mutexOwner);
+                        break;
+                    case 6:
+                        mutexOwner = null;
+                        log('[MUTEX]', 'tag-mutex', 'Task 3 finished critical section. Released Shared_Memory_Bus.', 'log-low');
+                        log('[PIP]', 'tag-pip', 'Task 3 priority restored to BASE (LOW).');
+
+                        document.getElementById('badge-low').className = 'badge bg-low';
+                        document.getElementById('badge-low').innerText = 'PRIO: LOW';
+                        document.getElementById('pipSuccess').style.display = 'none';
+
+                        mutexOwner = 'TASK_1';
+                        log('[MUTEX]', 'tag-mutex', 'Task 1 automatically acquired Shared_Memory_Bus.', 'log-high');
+                        updateUI('RUNNING', 'READY', 'READY', mutexOwner);
+                        break;
+                    case 7:
+                        mutexOwner = null;
+                        log('[MUTEX]', 'tag-mutex', 'Task 1 released Shared_Memory_Bus.', 'log-high');
+                        log('[SCHED]', 'tag-sched', 'Task 1 execution complete. Terminated.', 'log-high');
+                        log('[SCHED]', 'tag-sched', 'Dispatching Task 2 (Med).', 'log-med');
+                        updateUI('IDLE', 'RUNNING', 'READY', mutexOwner);
+                        break;
+                    case 8:
+                        log('[SCHED]', 'tag-sched', 'Task 2 execution complete. Terminated.', 'log-med');
+                        log('[SCHED]', 'tag-sched', 'Restoring Task 3 context.', 'log-low');
+                        updateUI('IDLE', 'IDLE', 'RUNNING', mutexOwner);
+                        break;
+                    case 9:
+                        log('[SCHED]', 'tag-sched', 'Task 3 execution complete. Terminated.', 'log-low');
+                        updateUI('IDLE', 'IDLE', 'IDLE', null);
+                        document.getElementById('btnStep').disabled = true;
+                        log('[SYSTEM]', 'tag-sched', 'Simulation sequence completed securely.');
+                        break;
+                }
+            }
+            // ---------------- ORIGINAL BUG SCENARIO ----------------
+            else {
+                switch (tick) {
+                    case 1:
+                        log('[SCHED]', 'tag-sched', 'Dispatching Task 3 (Low).', 'log-low');
+                        updateUI('IDLE', 'IDLE', 'RUNNING', null);
+                        break;
+                    case 2:
+                        mutexOwner = 'TASK_3';
+                        log('[MUTEX]', 'tag-mutex', 'Task 3 acquired Shared_Memory_Bus lock.', 'log-low');
+                        updateUI('IDLE', 'IDLE', 'RUNNING', mutexOwner);
+                        break;
+                    case 3:
+                        log('[SCHED]', 'tag-sched', 'Interrupt: Task 1 (High) arrived. Preempting Task 3.', 'log-high');
+                        updateUI('RUNNING', 'IDLE', 'READY', mutexOwner);
+                        break;
+                    case 4:
+                        log('[MUTEX]', 'tag-mutex', 'Task 1 requested Shared_Memory_Bus. Lock denied (held by Task 3).');
+                        log('[SCHED]', 'tag-sched', 'Task 1 state transition -> BLOCKED. Restoring Task 3 context.', 'log-high');
+                        updateUI('BLOCKED', 'IDLE', 'RUNNING', mutexOwner);
+                        break;
+                    case 5:
+                        log('[SCHED]', 'tag-sched', 'Interrupt: Task 2 (Med) arrived. Preempting Task 3.', 'log-med');
+                        updateUI('BLOCKED', 'RUNNING', 'READY', mutexOwner);
+                        break;
+                    case 6:
+                        document.getElementById('inversionAlert').style.display = 'block';
+                        log('[PANIC]', 'tag-err', 'PRIORITY INVERSION DETECTED.');
+                        log('[TRACE]', 'tag-err', 'Task 1 (High) waiting on Task 3 (Low).');
+                        log('[TRACE]', 'tag-err', 'Task 3 execution halted. CPU allocated to Task 2 (Med).');
+                        updateUI('BLOCKED', 'RUNNING', 'READY', mutexOwner);
+                        break;
+                    case 7:
+                        log('[EXEC]', 'tag-sched', 'Task 2 executing...', 'log-med');
+                        break;
+                    case 8:
+                        log('[SCHED]', 'tag-sched', 'Task 2 execution complete. Terminated.', 'log-med');
+                        log('[SCHED]', 'tag-sched', 'Restoring Task 3 context.', 'log-low');
+                        document.getElementById('inversionAlert').style.display = 'none';
+                        updateUI('BLOCKED', 'IDLE', 'RUNNING', mutexOwner);
+                        break;
+                    case 9:
+                        mutexOwner = null;
+                        log('[MUTEX]', 'tag-mutex', 'Task 3 released Shared_Memory_Bus lock.', 'log-low');
+                        updateUI('BLOCKED', 'IDLE', 'RUNNING', mutexOwner);
+                        break;
+                    case 10:
+                        mutexOwner = 'TASK_1';
+                        log('[SCHED]', 'tag-sched', 'Mutex freed. Waking Task 1. Preempting Task 3.', 'log-high');
+                        log('[MUTEX]', 'tag-mutex', 'Task 1 acquired Shared_Memory_Bus lock.', 'log-high');
+                        updateUI('RUNNING', 'IDLE', 'READY', mutexOwner);
+                        break;
+                    case 11:
+                        mutexOwner = null;
+                        log('[MUTEX]', 'tag-mutex', 'Task 1 released Shared_Memory_Bus lock.', 'log-high');
+                        log('[SCHED]', 'tag-sched', 'Task 1 execution complete. Terminated.', 'log-high');
+                        updateUI('IDLE', 'IDLE', 'READY', mutexOwner);
+                        break;
+                    case 12:
+                        log('[SCHED]', 'tag-sched', 'Restoring Task 3 context.', 'log-low');
+                        log('[SCHED]', 'tag-sched', 'Task 3 execution complete. Terminated.', 'log-low');
+                        updateUI('IDLE', 'IDLE', 'IDLE', null);
+                        document.getElementById('btnStep').disabled = true;
+                        log('[SYSTEM]', 'tag-sched', 'Simulation sequence completed.');
+                        break;
+                }
+            }
+        }
+
+        updateUI('IDLE', 'IDLE', 'IDLE', null);
+    </script>
+</body>
+</html>
