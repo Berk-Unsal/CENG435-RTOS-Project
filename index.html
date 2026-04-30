@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive RTOS Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1, h2 { color: #2c3e50; margin-top: 0; }
+        
+        .top-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #eef2f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input[type="number"], input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th { background-color: #f1f1f1; font-weight: 600; }
+        
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-add { background-color: #27ae60; color: white; }
+        .btn-add:hover { background-color: #2ecc71; }
+        .btn-delete { background-color: #e74c3c; color: white; padding: 6px 12px; }
+        .btn-delete:hover { background-color: #c0392b; }
+        .btn-run { background-color: #2980b9; color: white; font-size: 16px; padding: 10px 20px; }
+        .btn-run:hover { background-color: #3498db; }
+
+        .canvas-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            margin-top: 20px;
+        }
+        canvas { display: block; }
+        
+        .color-indicator {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>RTOS Preemptive Priority Simulator</h1>
+    
+    <div class="top-controls">
+        <div class="input-group">
+            <label for="simDuration"><strong>Simulation Duration (ms):</strong></label>
+            <input type="number" id="simDuration" value="100" min="10" max="2000">
+        </div>
+        <button class="btn-run" onclick="runSimulation()">Run Simulation</button>
+    </div>
+
+    <h2>Task Configuration</h2>
+    <table id="taskTable">
+        <thead>
+            <tr>
+                <th>Color</th>
+                <th>Task Name</th>
+                <th>Priority (Higher = First)</th>
+                <th>Period (ms)</th>
+                <th>Execution Time (ms)</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="taskList">
+            <!-- Dynamic rows will go here -->
+        </tbody>
+    </table>
+    
+    <button class="btn-add" onclick="addTask()">+ Add New Task</button>
+
+    <div class="canvas-wrapper">
+        <canvas id="timeline" height="400"></canvas>
+    </div>
+</div>
+
+<script>
+    // Initial ADAS State
+    let tasks = [
+        { id: generateId(), name: 'ISR_Radar', priority: 99, period: 20, exec: 2, color: '#e74c3c' },
+        { id: generateId(), name: 'Task_Compute', priority: 80, period: 20, exec: 5, color: '#2ecc71' },
+        { id: generateId(), name: 'Task_Log', priority: 10, period: 50, exec: 10, color: '#3498db' }
+    ];
+
+    const colors = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c'];
+
+    function generateId() {
+        return Math.random().toString(36).substr(2, 9);
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('taskList');
+        tbody.innerHTML = '';
+        tasks.forEach((task, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><div class="color-indicator" style="background-color: ${task.color}"></div></td>
+                <td><input type="text" value="${task.name}" onchange="updateTask('${task.id}', 'name', this.value)"></td>
+                <td><input type="number" value="${task.priority}" onchange="updateTask('${task.id}', 'priority', parseInt(this.value))"></td>
+                <td><input type="number" value="${task.period}" onchange="updateTask('${task.id}', 'period', parseInt(this.value))"></td>
+                <td><input type="number" value="${task.exec}" onchange="updateTask('${task.id}', 'exec', parseInt(this.value))"></td>
+                <td><button class="btn-delete" onclick="deleteTask('${task.id}')">Delete</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function addTask() {
+        tasks.push({
+            id: generateId(),
+            name: `Task_${tasks.length + 1}`,
+            priority: 50,
+            period: 100,
+            exec: 10,
+            color: colors[tasks.length % colors.length]
+        });
+        renderTable();
+        runSimulation();
+    }
+
+    function updateTask(id, field, value) {
+        const task = tasks.find(t => t.id === id);
+        if (task) task[field] = value;
+        runSimulation();
+    }
+
+    function deleteTask(id) {
+        tasks = tasks.filter(t => t.id !== id);
+        renderTable();
+        runSimulation();
+    }
+
+    function runSimulation() {
+        const duration = parseInt(document.getElementById('simDuration').value) || 100;
+        
+        // Prepare simulation state
+        let taskStates = tasks.map(t => ({
+            ...t,
+            remaining: 0,
+            misses: []
+        }));
+
+        let timelineBlocks = [];
+        let activeTaskId = null;
+        let blockStart = 0;
+
+        // Tick-by-tick simulation (1ms resolution)
+        for (let t = 0; t <= duration; t++) {
+            
+            // 1. Check for Task Arrivals and Deadlines
+            taskStates.forEach(ts => {
+                if (t % ts.period === 0 && t < duration) { // New period starts
+                    if (ts.remaining > 0 && t > 0) {
+                        // Task didn't finish previous execution -> Deadline Miss
+                        ts.misses.push(t);
+                    }
+                    ts.remaining = ts.exec; // Replenish execution time
+                }
+            });
+
+            // 2. Select Highest Priority Task that is Ready
+            let readyTasks = taskStates.filter(ts => ts.remaining > 0);
+            let nextActiveTask = null;
+
+            if (readyTasks.length > 0) {
+                // Sort by priority descending
+                readyTasks.sort((a, b) => b.priority - a.priority);
+                nextActiveTask = readyTasks[0];
+            }
+
+            // 3. Handle Context Switches / Timeline Recording
+            let nextTaskId = nextActiveTask ? nextActiveTask.id : null;
+
+            if (nextTaskId !== activeTaskId) {
+                if (activeTaskId !== null) {
+                    // Record the completed block
+                    timelineBlocks.push({
+                        id: activeTaskId,
+                        start: blockStart,
+                        end: t
+                    });
+                }
+                activeTaskId = nextTaskId;
+                blockStart = t;
+            }
+
+            // 4. Execute the task for 1 tick
+            if (nextActiveTask) {
+                nextActiveTask.remaining--;
+            }
+        }
+
+        drawTimeline(duration, timelineBlocks, taskStates);
+    }
+
+    function drawTimeline(duration, blocks, taskStates) {
+        const canvas = document.getElementById('timeline');
+        const ctx = canvas.getContext('2d');
+        
+        // Calculate dimensions
+        const PADDING_TOP = 40;
+        const PADDING_BOTTOM = 40;
+        const LABEL_WIDTH = 150;
+        const ROW_HEIGHT = 50;
+        const width = Math.max(1000, duration * 5 + LABEL_WIDTH + 50); // Dynamic width based on time
+        const height = PADDING_TOP + (tasks.length * ROW_HEIGHT) + PADDING_BOTTOM;
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const scaleX = (width - LABEL_WIDTH - 50) / duration;
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw Time Grid
+        ctx.fillStyle = '#666';
+        ctx.font = '12px Arial';
+        for (let t = 0; t <= duration; t += (duration > 200 ? 50 : 10)) {
+            let x = LABEL_WIDTH + t * scaleX;
+            ctx.beginPath();
+            ctx.moveTo(x, PADDING_TOP - 10);
+            ctx.lineTo(x, height - PADDING_BOTTOM);
+            ctx.strokeStyle = t === 0 ? '#333' : '#eee';
+            ctx.stroke();
+            ctx.textAlign = 'center';
+            ctx.fillText(t, x, height - PADDING_BOTTOM + 20);
+        }
+
+        // Draw Task Rows and Names
+        taskStates.forEach((task, index) => {
+            let y = PADDING_TOP + index * ROW_HEIGHT;
+            
+            // Row divider
+            ctx.beginPath();
+            ctx.moveTo(0, y + ROW_HEIGHT);
+            ctx.lineTo(width, y + ROW_HEIGHT);
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.stroke();
+
+            // Task Name
+            ctx.fillStyle = task.color;
+            ctx.textAlign = 'right';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(task.name, LABEL_WIDTH - 15, y + ROW_HEIGHT / 2 + 5);
+
+            // Draw Deadline Miss Markers
+            task.misses.forEach(missTime => {
+                let mx = LABEL_WIDTH + missTime * scaleX;
+                ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; // Faded red warning
+                ctx.fillRect(mx - 2, y + 5, 4, ROW_HEIGHT - 10);
+                
+                ctx.fillStyle = '#c0392b';
+                ctx.font = 'bold 16px Arial';
+                ctx.fillText('! Miss', mx + 20, y + 20);
+            });
+        });
+
+        // Draw Execution Blocks
+        blocks.forEach(block => {
+            let taskIndex = tasks.findIndex(t => t.id === block.id);
+            if (taskIndex === -1) return;
+            
+            let task = tasks[taskIndex];
+            let x = LABEL_WIDTH + block.start * scaleX;
+            let y = PADDING_TOP + taskIndex * ROW_HEIGHT + 10; // +10 for vertical padding
+            let w = (block.end - block.start) * scaleX;
+            let h = ROW_HEIGHT - 20;
+
+            // Block Fill
+            ctx.fillStyle = task.color;
+            ctx.fillRect(x, y, w, h);
+            
+            // Block Border
+            ctx.strokeStyle = '#rgba(0,0,0,0.2)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, w, h);
+        });
+    }
+
+    // Initialize
+    renderTable();
+    runSimulation();
+</script>
+
+</body>
+</html>
