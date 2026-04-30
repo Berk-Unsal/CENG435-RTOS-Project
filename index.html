@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Case Study 6 - Shared Network Driver</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3efe9;
+      --panel: #fff9f0;
+      --ink: #2d2a26;
+      --muted: #6e6a63;
+      --accent: #ff6b35;
+      --accent-2: #2a9d8f;
+      --accent-3: #264653;
+      --grid: #e4ddd3;
+      --shadow: 0 14px 30px rgba(46, 44, 40, 0.15);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      background: radial-gradient(1200px 600px at 10% 5%, #ffe6cf 0%, transparent 55%),
+                  radial-gradient(900px 500px at 90% 10%, #d6f5ef 0%, transparent 50%),
+                  var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 28px 6vw 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+    }
+
+    header h1 {
+      font-size: clamp(1.6rem, 2.6vw, 2.6rem);
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 700px;
+      color: var(--muted);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+      gap: 22px;
+      padding: 0 6vw 40px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      animation: rise 0.6s ease;
+    }
+
+    @keyframes rise {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-3);
+    }
+
+    .section {
+      padding: 12px 0;
+      border-top: 1px solid var(--grid);
+    }
+
+    .section:first-of-type { border-top: none; }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+    }
+
+    input[type="number"],
+    input[type="range"],
+    select {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #d7d0c6;
+      padding: 8px 10px;
+      background: #fff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.85rem;
+    }
+
+    input[type="range"] { padding: 0; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid #e4ddd3;
+      font-size: 0.78rem;
+      margin: 6px 4px 0 0;
+    }
+
+    .btn {
+      width: 100%;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-weight: 700;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 8px 16px rgba(255, 107, 53, 0.25);
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+
+    .btn.secondary {
+      background: #fff;
+      color: var(--accent-3);
+      border: 1px solid #d7d0c6;
+      box-shadow: none;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .stat {
+      background: #fff;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #e4ddd3;
+    }
+
+    .stat span {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .stat strong {
+      font-size: 1.1rem;
+    }
+
+    .canvas-wrap {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px;
+      border: 1px solid #e4ddd3;
+      overflow-x: auto;
+    }
+
+    canvas { display: block; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .legend .chip { font-family: "IBM Plex Mono", monospace; }
+
+    .glossary {
+      font-size: 0.86rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .glossary strong { color: var(--ink); }
+
+    footer {
+      padding: 10px 6vw 30px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Case Study 6: Shared Network Driver</h1>
+    <p>Extending the ADAS system with Ethernet I/O, a shared driver, and a network stack task. Adjust priority, load, and orchestration to observe successful transmission or contention-driven drops.</p>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>Scenario Controls</h2>
+      <div class="section">
+        <label for="totalTime">Timeline Length (ms)</label>
+        <input id="totalTime" type="number" min="200" max="1200" value="500" />
+      </div>
+      <div class="section row">
+        <div>
+          <label for="netPriority">Net Stack Priority</label>
+          <input id="netPriority" type="number" min="10" max="100" value="65" />
+        </div>
+        <div>
+          <label for="netQueueCap">Net Queue Capacity</label>
+          <input id="netQueueCap" type="number" min="2" max="20" value="8" />
+        </div>
+      </div>
+      <div class="section row">
+        <div>
+          <label for="txTime">HW TX Time / Msg (ms)</label>
+          <input id="txTime" type="number" min="1" max="12" value="4" />
+        </div>
+        <div>
+          <label for="netStackExec">Net Stack Exec (ms)</label>
+          <input id="netStackExec" type="number" min="1" max="10" value="2" />
+        </div>
+      </div>
+      <div class="section">
+        <label for="obstacleRate">Radar Obstacle Chance (%)</label>
+        <input id="obstacleRate" type="range" min="0" max="100" value="60" />
+      </div>
+      <div class="section row">
+        <div>
+          <label for="logBurst">Log Task Net Burst (msgs)</label>
+          <input id="logBurst" type="number" min="1" max="4" value="1" />
+        </div>
+        <div>
+          <label for="radarBurst">ISR Net Burst (msgs)</label>
+          <input id="radarBurst" type="number" min="1" max="3" value="1" />
+        </div>
+      </div>
+      <div class="section row">
+        <div>
+          <label for="seed">Random Seed</label>
+          <input id="seed" type="number" min="1" value="42" />
+        </div>
+        <div>
+          <label for="preset">Preset</label>
+          <select id="preset">
+            <option value="balanced">Balanced Orchestration</option>
+            <option value="contention">Contention / Failure</option>
+          </select>
+        </div>
+      </div>
+      <div class="section">
+        <label for="zoom">Timeline & Queue Zoom</label>
+        <input id="zoom" type="range" min="1" max="3" value="1" step="0.25" />
+      </div>
+      <div class="section">
+        <button class="btn" id="runBtn">Run Simulation</button>
+        <button class="btn secondary" id="applyPreset" style="margin-top:10px;">Apply Preset</button>
+      </div>
+      <div class="section">
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="section glossary">
+        <strong>Network terms (quick definitions)</strong><br />
+        ISR: interrupt service routine that reacts immediately.<br />
+        Driver: low-level code that controls the NIC hardware.<br />
+        Stack: protocol engine (TCP/IP) that formats and routes data.<br />
+        TX/RX Ring: circular buffers holding outgoing/incoming frames.<br />
+        MTU: maximum packet size the link can carry without fragmentation.<br />
+        Backpressure: slowing a producer when queues are full.<br />
+        Drop: a message discarded when buffers overflow or deadlines expire.
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Timeline & Queues</h2>
+      <div class="canvas-wrap">
+        <canvas id="timeline" width="1200" height="420"></canvas>
+      </div>
+      <div class="canvas-wrap" style="margin-top:14px;">
+        <canvas id="queueChart" width="1200" height="180"></canvas>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
+  </main>
+
+  <footer>
+    Case Study 6 emphasizes shared I/O: both ISR_Radar and Task_Log share a network driver via the Net Stack task.
+  </footer>
+
+  <script>
+    const COLORS = {
+      isr: "#ff6b35",
+      compute: "#264653",
+      net: "#2a9d8f",
+      log: "#8d6b94",
+      hw: "#4a4e69",
+      mutex: "#f4a261",
+      idle: "#e9e1d7"
+    };
+
+    const BASE_TASKS = [
+      { id: "isr", name: "ISR_Radar", priority: 92, period: 20, exec: 1 },
+      { id: "compute", name: "Task_Compute", priority: 80, period: 20, exec: 3 },
+      { id: "log", name: "Task_Log", priority: 35, period: 50, exec: 4 }
+    ];
+
+    const radarQueueCap = 4;
+    const brakeHold = 5;
+
+    const rand = (seed) => {
+      let value = seed % 2147483647;
+      if (value <= 0) value += 2147483646;
+      return () => (value = (value * 16807) % 2147483647) / 2147483647;
+    };
+
+    const byId = (id) => document.getElementById(id);
+    let lastSimulation = null;
+
+    const applyPreset = () => {
+      const preset = byId("preset").value;
+      if (preset === "balanced") {
+        byId("netPriority").value = 65;
+        byId("netQueueCap").value = 8;
+        byId("txTime").value = 4;
+        byId("netStackExec").value = 2;
+        byId("logBurst").value = 1;
+        byId("radarBurst").value = 1;
+        byId("obstacleRate").value = 60;
+      } else {
+        byId("netPriority").value = 45;
+        byId("netQueueCap").value = 5;
+        byId("txTime").value = 7;
+        byId("netStackExec").value = 3;
+        byId("logBurst").value = 2;
+        byId("radarBurst").value = 2;
+        byId("obstacleRate").value = 80;
+      }
+    };
+
+    const runSimulation = () => {
+      const totalTime = parseInt(byId("totalTime").value, 10);
+      const netPriority = parseInt(byId("netPriority").value, 10);
+      const netQueueCap = parseInt(byId("netQueueCap").value, 10);
+      const txTime = parseInt(byId("txTime").value, 10);
+      const netStackExec = parseInt(byId("netStackExec").value, 10);
+      const obstacleRate = parseInt(byId("obstacleRate").value, 10) / 100;
+      const logBurst = parseInt(byId("logBurst").value, 10);
+      const radarBurst = parseInt(byId("radarBurst").value, 10);
+      const seed = parseInt(byId("seed").value, 10);
+
+      const random = rand(seed);
+
+      const tasks = BASE_TASKS.map(t => ({ ...t }));
+      const netTask = { id: "net", name: "Task_NetStack", priority: netPriority, period: 1, exec: netStackExec };
+
+      const rows = [
+        { id: "isr", label: "ISR_Radar", color: COLORS.isr },
+        { id: "compute", label: "Task_Compute", color: COLORS.compute },
+        { id: "net", label: "Task_NetStack", color: COLORS.net },
+        { id: "log", label: "Task_Log", color: COLORS.log },
+        { id: "hw", label: "Net_HW (TX)", color: COLORS.hw },
+        { id: "mutex", label: "Mutex_Brake", color: COLORS.mutex },
+        { id: "idle", label: "Idle", color: COLORS.idle }
+      ];
+
+      const jobs = [];
+      const blocks = [];
+      const hwBlocks = [];
+      const mutexBlocks = [];
+      const queueSeries = [];
+      const radarSeries = [];
+
+      const drops = { isr: 0, log: 0 };
+      const netQueue = [];
+      const radarQueue = [];
+
+      let netJob = null;
+      let activeJob = null;
+      let prevJob = null;
+      let blockStart = 0;
+      let hwBusyUntil = 0;
+      let brakeLockedUntil = 0;
+      let cpuBusy = 0;
+      let maxNetQueue = 0;
+
+      let currentTime = 0;
+
+      const enqueueNet = (source) => {
+        if (netQueue.length >= netQueueCap) {
+          drops[source] += 1;
+          return;
+        }
+        netQueue.push({ source, time: currentTime });
+      };
+
+      const enqueueRadar = () => {
+        if (radarQueue.length >= radarQueueCap) {
+          return;
+        }
+        radarQueue.push({ time: currentTime });
+      };
+
+      for (currentTime = 0; currentTime <= totalTime; currentTime += 1) {
+        // Release periodic tasks
+        tasks.forEach(task => {
+          if (currentTime % task.period === 0) {
+            jobs.push({ taskId: task.id, remaining: task.exec, priority: task.priority, release: currentTime, checkedRadar: false, hasRadar: false });
+          }
+        });
+
+        // Create net stack job if needed and HW is idle
+        if (!netJob && netQueue.length > 0 && currentTime >= hwBusyUntil) {
+          netJob = { taskId: "net", remaining: netTask.exec, priority: netTask.priority, release: currentTime };
+        }
+
+        // Determine ready jobs
+        const ready = jobs.filter(j => j.remaining > 0 && j.release <= currentTime).filter(j => !(j.taskId === "log" && currentTime < brakeLockedUntil));
+        if (netJob) ready.push(netJob);
+
+        ready.sort((a, b) => b.priority - a.priority);
+        activeJob = ready[0] || null;
+
+        if (activeJob !== prevJob) {
+          if (currentTime > 0) {
+            const prevId = prevJob ? prevJob.taskId : "idle";
+            blocks.push({ id: prevId, start: blockStart, end: currentTime });
+          }
+          blockStart = currentTime;
+          prevJob = activeJob;
+        }
+
+        if (activeJob) {
+          cpuBusy += 1;
+          if (activeJob.taskId === "compute" && !activeJob.checkedRadar) {
+            activeJob.checkedRadar = true;
+            if (radarQueue.length > 0) {
+              radarQueue.shift();
+              activeJob.hasRadar = true;
+            }
+          }
+          activeJob.remaining -= 1;
+        }
+
+        if (netJob && netJob.remaining <= 0) {
+          const msg = netQueue.shift();
+          if (msg) {
+            hwBusyUntil = Math.max(hwBusyUntil, currentTime) + txTime;
+            hwBlocks.push({ start: currentTime, end: hwBusyUntil });
+          }
+          netJob = null;
+        }
+
+        jobs.forEach(job => {
+          if (job.remaining === 0 && !job.completed) {
+            job.completed = true;
+            if (job.taskId === "isr") {
+              const hit = random() < obstacleRate;
+              if (hit) {
+                enqueueRadar();
+                for (let i = 0; i < radarBurst; i += 1) enqueueNet("isr");
+              }
+            }
+            if (job.taskId === "log") {
+              for (let i = 0; i < logBurst; i += 1) enqueueNet("log");
+            }
+            if (job.taskId === "compute" && job.hasRadar) {
+              const start = currentTime;
+              brakeLockedUntil = Math.max(brakeLockedUntil, currentTime + brakeHold);
+              mutexBlocks.push({ start, end: brakeLockedUntil });
+            }
+          }
+        });
+
+        queueSeries.push(netQueue.length);
+        radarSeries.push(radarQueue.length);
+        maxNetQueue = Math.max(maxNetQueue, netQueue.length);
+      }
+
+      if (blockStart < totalTime) {
+        const finalId = activeJob ? activeJob.taskId : "idle";
+        blocks.push({ id: finalId, start: blockStart, end: totalTime });
+      }
+
+      lastSimulation = {
+        blocks,
+        hwBlocks,
+        mutexBlocks,
+        rows,
+        totalTime,
+        queueSeries,
+        radarSeries,
+        netQueueCap,
+        radarQueueCap,
+        drops,
+        maxNetQueue,
+        cpuBusy
+      };
+
+      renderTimeline(lastSimulation);
+      renderQueues(lastSimulation);
+      renderLegend(rows);
+      renderStats({ drops, maxNetQueue, cpuBusy, totalTime });
+    };
+
+    const renderTimeline = ({ blocks, hwBlocks, mutexBlocks, rows, totalTime }) => {
+      const canvas = byId("timeline");
+      const ctx = canvas.getContext("2d");
+      const zoom = parseFloat(byId("zoom").value) || 1;
+      const width = Math.max(1200, totalTime * 2.2 * zoom);
+      canvas.width = width;
+
+      const padding = { left: 140, top: 30, right: 24, bottom: 30 };
+      const rowH = (canvas.height - padding.top - padding.bottom) / rows.length;
+      const scale = (canvas.width - padding.left - padding.right) / totalTime;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "#eee5dc";
+      ctx.lineWidth = 1;
+      for (let t = 0; t <= totalTime; t += 50) {
+        const x = padding.left + t * scale;
+        ctx.beginPath();
+        ctx.moveTo(x, padding.top - 10);
+        ctx.lineTo(x, canvas.height - padding.bottom + 10);
+        ctx.stroke();
+        ctx.fillStyle = "#9b948b";
+        ctx.font = "12px IBM Plex Mono";
+        ctx.fillText(t, x - 6, canvas.height - padding.bottom + 18);
+      }
+
+      rows.forEach((row, i) => {
+        const y = padding.top + i * rowH + rowH * 0.5;
+        ctx.fillStyle = row.color;
+        ctx.font = "12px IBM Plex Mono";
+        ctx.textAlign = "right";
+        ctx.fillText(row.label, padding.left - 12, y + 4);
+        ctx.beginPath();
+        ctx.strokeStyle = "#f2ebe2";
+        ctx.moveTo(padding.left, padding.top + (i + 1) * rowH);
+        ctx.lineTo(canvas.width - padding.right, padding.top + (i + 1) * rowH);
+        ctx.stroke();
+      });
+
+      const drawBlock = (id, start, end, color) => {
+        const rowIndex = rows.findIndex(r => r.id === id);
+        if (rowIndex === -1 || start === end) return;
+        const y = padding.top + rowIndex * rowH + rowH * 0.2;
+        const x = padding.left + start * scale;
+        const w = Math.max(1, (end - start) * scale);
+        const h = rowH * 0.6;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w, h);
+      };
+
+      blocks.forEach(block => drawBlock(block.id, block.start, block.end, COLORS[block.id] || COLORS.idle));
+      hwBlocks.forEach(block => drawBlock("hw", block.start, block.end, COLORS.hw));
+      mutexBlocks.forEach(block => drawBlock("mutex", block.start, block.end, COLORS.mutex));
+    };
+
+    const renderQueues = ({ queueSeries, radarSeries, totalTime, netQueueCap, radarQueueCap }) => {
+      const canvas = byId("queueChart");
+      const ctx = canvas.getContext("2d");
+      const zoom = parseFloat(byId("zoom").value) || 1;
+      const width = Math.max(1200, totalTime * 2.2 * zoom);
+      canvas.width = width;
+
+      const padding = { left: 60, right: 20, top: 24, bottom: 30 };
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const chartHeight = canvas.height - padding.top - padding.bottom;
+      const scaleX = (canvas.width - padding.left - padding.right) / totalTime;
+      const scaleY = chartHeight / Math.max(netQueueCap, radarQueueCap, 1);
+
+      const drawLine = (series, color) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        series.forEach((val, idx) => {
+          const x = padding.left + idx * scaleX;
+          const y = canvas.height - padding.bottom - val * scaleY;
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      };
+
+      drawLine(queueSeries, COLORS.net);
+      drawLine(radarSeries, COLORS.isr);
+
+      ctx.fillStyle = "#8f877d";
+      ctx.font = "12px IBM Plex Mono";
+      ctx.fillText("Net Queue", padding.left, padding.top - 6);
+      ctx.fillStyle = COLORS.net;
+      ctx.fillRect(padding.left + 74, padding.top - 14, 12, 6);
+      ctx.fillStyle = "#8f877d";
+      ctx.fillText("Radar Queue", padding.left + 110, padding.top - 6);
+      ctx.fillStyle = COLORS.isr;
+      ctx.fillRect(padding.left + 200, padding.top - 14, 12, 6);
+    };
+
+    const renderLegend = (rows) => {
+      const legend = byId("legend");
+      legend.innerHTML = "";
+      rows.forEach(row => {
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.innerHTML = `<span style="width:10px;height:10px;border-radius:999px;background:${row.color};display:inline-block"></span>${row.label}`;
+        legend.appendChild(chip);
+      });
+    };
+
+    const renderStats = ({ drops, maxNetQueue, cpuBusy, totalTime }) => {
+      const stats = byId("stats");
+      const cpuLoad = Math.round((cpuBusy / totalTime) * 100);
+      stats.innerHTML = `
+        <div class="stat"><span>CPU Busy</span><strong>${cpuLoad}%</strong></div>
+        <div class="stat"><span>Net Queue Peak</span><strong>${maxNetQueue}</strong></div>
+        <div class="stat"><span>Drops (ISR)</span><strong>${drops.isr}</strong></div>
+        <div class="stat"><span>Drops (Log)</span><strong>${drops.log}</strong></div>
+      `;
+    };
+
+    byId("runBtn").addEventListener("click", runSimulation);
+    byId("applyPreset").addEventListener("click", () => { applyPreset(); runSimulation(); });
+    byId("zoom").addEventListener("input", () => {
+      if (!lastSimulation) return;
+      renderTimeline(lastSimulation);
+      renderQueues(lastSimulation);
+    });
+
+    applyPreset();
+    runSimulation();
+  </script>
+</body>
+</html>
