@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS4 - Deadlock & Timeout Simulator</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
+        .btn { padding: 12px 20px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; margin-right: 10px; transition: opacity 0.2s; }
+        .btn-red { background-color: #e74c3c; }
+        .btn-green { background-color: #2ecc71; }
+        .btn:hover { opacity: 0.8; }
+        .log-box { margin-top: 20px; background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 4px; font-family: monospace; height: 150px; overflow-y: auto; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; text-align: center; font-size: 0.9rem; }
+        th, td { border: 1px solid #bdc3c7; padding: 12px; }
+        th { background-color: #ecf0f1; color: #2c3e50; }
+        .state-running { background-color: #2ecc71; color: white; font-weight: bold; }
+        .state-blocked { background-color: #e74c3c; color: white; font-weight: bold; }
+        .state-ready { background-color: #f1c40f; color: black; font-weight: bold; }
+        .state-done { background-color: #95a5a6; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="panel">
+    <h2>Case Study 4: Deadlock Visualization</h2>
+    <p>Use the buttons below to simulate the deadlock scenario and the implemented solution.</p>
+    
+    <button class="btn btn-red" onclick="runSimulation(false)">Start 4.b Scenario (Create Deadlock)</button>
+    <button class="btn btn-green" onclick="runSimulation(true)">Start 4.c Scenario (Mutex Timeout)</button>
+
+    <div class="log-box" id="logBox">System Status: Ready. Waiting for scenario...</div>
+
+    <table id="timeline">
+        <thead>
+            <tr>
+                <th>Time (ms)</th>
+                <th>Task A State</th>
+                <th>Task B State</th>
+                <th>System Event Log</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    function logMessage(msg) {
+        const logBox = document.getElementById('logBox');
+        logBox.innerHTML += `<br>[${new Date().toLocaleTimeString()}] ${msg}`;
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function addTableRow(time, stateA, stateB, eventMsg) {
+        const tbody = document.querySelector('#timeline tbody');
+        const tr = document.createElement('tr');
+        const getClass = (state) => {
+            if(state.includes("RUNNING")) return "state-running";
+            if(state.includes("BLOCKED")) return "state-blocked";
+            if(state.includes("DONE")) return "state-done";
+            return "state-ready";
+        };
+        tr.innerHTML = `<td>${time}</td><td class="${getClass(stateA)}">${stateA}</td><td class="${getClass(stateB)}">${stateB}</td><td><strong>${eventMsg}</strong></td>`;
+        tbody.appendChild(tr);
+    }
+
+    function runSimulation(useTimeout) {
+        document.querySelector('#timeline tbody').innerHTML = "";
+        document.getElementById('logBox').innerHTML = "Simulation started...";
+        
+        setTimeout(() => { addTableRow("0", "RUNNING (Holds M_Sensor)", "WAITING", "Task A acquired M_Sensor."); }, 500);
+        setTimeout(() => { addTableRow("20", "READY (Holds M_Sensor)", "RUNNING (Holds M_Disk)", "Task B preempted A and acquired M_Disk."); }, 1500);
+        setTimeout(() => { addTableRow("40", "BLOCKED (Waiting for M_Disk)", "READY (Holds M_Disk)", "Task A requested M_Disk (Denied: Held by B)."); }, 2500);
+        setTimeout(() => { 
+            addTableRow("60", "BLOCKED (Waiting for M_Disk)", "BLOCKED (Waiting for M_Sensor)", "DEADLOCK DETECTED! (Circular Wait)"); 
+            if(!useTimeout) logMessage("SYSTEM FREEZE: Tasks are infinitely waiting for each other.");
+        }, 3500);
+
+        if (useTimeout) {
+            setTimeout(() => {
+                logMessage("Timeout Triggered: Task B exceeded wait threshold.");
+                addTableRow("160", "BLOCKED (Waiting for M_Disk)", "READY (Aborted Request)", "Task B Timed Out! Released M_Disk.");
+            }, 5500);
+            setTimeout(() => { addTableRow("170", "RUNNING (Holds both Mutexes)", "READY", "Task A acquired M_Disk and recovered."); }, 6500);
+            setTimeout(() => { addTableRow("200", "DONE", "RUNNING", "Task A completed. System returned to normal flow."); }, 7500);
+        }
+    }
+</script>
+</body>
+</html>
