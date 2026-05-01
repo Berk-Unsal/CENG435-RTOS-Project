@@ -452,7 +452,7 @@
                     stats.d++; log(`DROP: [D${data}] discarded!`, 'e');
                 } else if (mode === 'overwrite') {
                     let old = q.shift(); q.push(data);
-                    log(`OVERWRITE: [D${old}] dropped, [D${data}] saved`, 'sys');
+                    log(`OVERWRITE: [D${old}] evicted, [D${data}] saved`, 'sys');
                 }
             }
             drawUI();
