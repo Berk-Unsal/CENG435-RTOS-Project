@@ -1,366 +1,186 @@
-
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RTOS Scheduling Simulator - Ultra Stable</title>
+    <title>RTOS Case Study 1 Simulator - Ahmet</title>
     <style>
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            margin: 0; padding: 20px; background-color: #f4f7f6;
-            display: grid; grid-template-columns: 420px 1fr; gap: 20px;
-        }
-        .panel { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { color: #2c3e50; font-size: 1.1rem; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        th, td { padding: 5px; text-align: left; border-bottom: 1px solid #eee; }
-        input[type="number"], select { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }
-        input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
-        .controls-row { display: flex; gap: 10px; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 4px; }
-        
-        .btn { display: block; width: 100%; padding: 10px; background-color: #27ae60; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        .btn:hover:not(:disabled) { background-color: #2ecc71; }
-        .btn:disabled { background-color: #95a5a6; cursor: not-allowed; opacity: 0.7; }
-        
-        .canvas-container { width: 100%; height: 600px; overflow-x: auto; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
-        canvas { display: block; }
-        .util-box { margin-top: 10px; padding: 10px; background: #e8f4fd; border-radius: 4px; font-weight: bold; font-size: 0.9rem; color: #2980b9; }
-        .error-box { margin-top: 10px; padding: 10px; background: #ffcccc; border: 1px solid #ff0000; border-radius: 4px; font-weight: bold; font-size: 0.9rem; color: #990000; display: none; }
-        .dimmed-row { opacity: 0.4; transition: opacity 0.2s; }
-        .sys-task { color: #c0392b; font-weight: bold; }
-        .usr-task { color: #2980b9; font-weight: bold; }
-        
-        .toggle-container { display: flex; align-items: center; gap: 10px; margin-top: 15px; background: #fff3cd; padding: 10px; border-radius: 4px; border: 1px solid #ffeeba; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+        h2 { color: #1a73e8; border-bottom: 2px solid #e8eaed; padding-bottom: 10px; }
+        .setup-section { display: flex; gap: 20px; margin-bottom: 25px; align-items: flex-start; }
+        .task-table { flex: 2; border-collapse: collapse; width: 100%; }
+        .task-table th, .task-table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        .task-table th { background: #f8f9fa; }
+        .config-panel { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; }
+        .controls { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        button { padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-priority { background: #1a73e8; color: white; }
+        .btn-rr { background: #34a853; color: white; }
+        .btn-reset { background: #dadce0; color: #3c4043; }
+        button:hover { opacity: 0.85; transform: translateY(-1px); }
+        .gantt-wrapper { margin-top: 30px; }
+        .gantt-container { overflow-x: auto; background: #202124; padding: 20px; border-radius: 10px; display: flex; gap: 2px; min-height: 50px; }
+        .gantt-bar { min-width: 35px; height: 45px; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; border-radius: 4px; }
+        .H { background: #ea4335; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); }
+        .M { background: #fbbc04; color: #202124; }
+        .L { background: #34a853; }
+        .legend { margin-top: 10px; display: flex; gap: 15px; font-size: 13px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
+        .status-msg { margin-top: 15px; padding: 10px; border-radius: 5px; font-weight: 500; }
     </style>
 </head>
 <body>
 
-    <div class="panel">
-        <h2>Algoritma ve Görevler</h2>
-        
-        <div class="controls-row">
-            <div style="flex: 1;">
-                <label>Algoritma:</label>
-                <select id="algoSelect" onchange="runSimOnly()">
-                    <option value="priority">Preemptive Priority</option>
-                    <option value="rr">Round Robin</option>
-                </select>
-            </div>
-            <div id="quantumDiv" style="flex: 0.5; display: none;">
-                <label>Quantum:</label>
-                <input type="number" id="quantumInput" value="5" min="1" oninput="runSimOnly()">
-            </div>
-        </div>
-
-        <table id="taskTable">
+<div class="container">
+    <h2>Case Study 1: Scheduling, Starvation & Aging</h2>
+    
+    <div class="setup-section">
+        <table class="task-table">
             <thead>
                 <tr>
-                    <th>✓</th>
-                    <th>Görev Adı</th>
-                    <th>Prio</th>
-                    <th>Periyot</th>
-                    <th>Base Exec</th>
+                    <th>Task</th>
+                    <th>Priority (Static)</th>
+                    <th>Duration (Execution Time)</th>
+                    <th>Final Priority</th>
+                    <th>Current Status</th>
                 </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="taskBody">
+                <!-- Data populated by JS -->
+            </tbody>
         </table>
-        
-        <div class="toggle-container">
-            <input type="checkbox" id="randToggle" onchange="toggleRand()">
-            <label for="randToggle" style="font-weight: bold; font-size: 0.85rem; color: #856404;">Rastgelelik Ekle (Maks +%10)</label>
-        </div>
-        
-        <button class="btn" id="rerollBtn" onclick="syncAndRun(true)" disabled style="margin-top: 10px;">Zamanlamaları Yeniden Oluştur (Re-Roll)</button>
-        
-        <div id="utilizationInfo" class="util-box">Nominal CPU Yükü: %0</div>
-        <div id="errorBox" class="error-box"></div>
-        
-        <div style="margin-top: 15px;">
-            <label style="font-size: 0.85rem; font-weight: bold;">Zaman Ekseni Zoom:</label>
-            <input type="range" id="zoomLevel" min="1" max="5" value="1" step="0.5" oninput="redraw()">
+
+        <div class="config-panel">
+            <strong>Simulation Settings</strong>
+            <div style="margin-top:10px;">
+                <label><input type="checkbox" id="agingCheck"> Enable Aging (1.c Fix)</label>
+            </div>
+            <div style="margin-top:10px; font-size: 0.85em; color: #666;">
+                Aging Rule: +1 priority every 5s of waiting.
+            </div>
         </div>
     </div>
 
-    <div class="panel" style="padding: 0; min-width: 0;">
-        <div class="canvas-container" id="canvasWrapper">
-            <canvas id="timelineCanvas" height="580"></canvas>
+    <div class="controls">
+        <button class="btn-priority" onclick="simulate('priority')">Run Priority Scheduling</button>
+        <button class="btn-rr" onclick="simulate('rr')">Run Round Robin (1.a)</button>
+        <button class="btn-reset" onclick="initTasks()">Reset Values</button>
+    </div>
+
+    <div class="gantt-wrapper">
+        <strong>Gantt Chart (Visual Output):</strong>
+        <div class="gantt-container" id="gantt"></div>
+        <div class="legend">
+            <div class="legend-item"><span class="dot" style="background:#ea4335"></span> High (H)</div>
+            <div class="legend-item"><span class="dot" style="background:#fbbc04"></span> Medium (M)</div>
+            <div class="legend-item"><span class="dot" style="background:#34a853"></span> Low (L)</div>
         </div>
     </div>
 
-    <script>
-        // TARAYICI HATALARINI YAKALA
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            const errBox = document.getElementById('errorBox');
-            if (errBox) {
-                errBox.style.display = 'block';
-                errBox.innerHTML = `Sistem Hatası Yakalandı: <br>${msg} <br>Satır: ${lineNo}`;
-            }
-            return false;
-        };
+    <div id="statusBox" class="status-msg"></div>
+</div>
 
-        let tasks = [
-            { id: 's1', name: 'Watchdog', type: 'sys', priority: 99, period: 100, exec: 2, color: '#c0392b', enabled: true },
-            { id: 's2', name: 'OS Tick', type: 'sys', priority: 90, period: 25, exec: 3, color: '#e74c3c', enabled: true },
-            { id: 's3', name: 'I/O IRQ', type: 'sys', priority: 85, period: 50, exec: 4, color: '#e67e22', enabled: true },
-            { id: 'u1', name: 'Control Loop', type: 'usr', priority: 80, period: 25, exec: 6, color: '#2ecc71', enabled: true },
-            { id: 'u2', name: 'Sensor Agg', type: 'usr', priority: 70, period: 50, exec: 8, color: '#27ae60', enabled: true },
-            { id: 'u3', name: 'Web Server', type: 'usr', priority: 50, period: 100, exec: 15, color: '#3498db', enabled: true },
-            { id: 'u4', name: 'Bg Logger', type: 'usr', priority: 10, period: 100, exec: 15, color: '#9b59b6', enabled: true }
+<script>
+    let tasks = [];
+
+    function initTasks() {
+        tasks = [
+            { id: 'H', p: 3, currentP: 3, dur: 4, rem: 4, wait: 0 },
+            { id: 'M', p: 2, currentP: 2, dur: 4, rem: 4, wait: 0 },
+            { id: 'L', p: 1, currentP: 1, dur: 4, rem: 4, wait: 0 }
         ];
+        renderTable();
+        document.getElementById('gantt').innerHTML = '';
+        document.getElementById('statusBox').innerText = 'Ready. Modify durations in the table to start.';
+        document.getElementById('statusBox').style.background = '#e8f0fe';
+    }
 
-        const totalTime = 200; 
-        let canvas, ctx, wrapper;
-        let generatedJobs = [];
-        let lastResult = { blocks: [], preemptions: [], misses: [] };
+    function renderTable() {
+        const body = document.getElementById('taskBody');
+        body.innerHTML = tasks.map((t, idx) => `
+            <tr>
+                <td>Task ${t.id}</td>
+                <td>${t.p}</td>
+                <td><input type="number" value="${t.dur}" onchange="updateDur(${idx}, this.value)" style="width:50px"></td>
+                <td id="prio-${t.id}">${t.currentP}</td>
+                <td id="stat-${t.id}">Ready</td>
+            </tr>
+        `).join('');
+    }
 
-        function init() {
-            try {
-                canvas = document.getElementById('timelineCanvas');
-                ctx = canvas.getContext('2d');
-                wrapper = document.getElementById('canvasWrapper');
+    function updateDur(idx, val) {
+        tasks[idx].dur = parseInt(val);
+        tasks[idx].rem = parseInt(val);
+    }
 
-                const tbody = document.querySelector('#taskTable tbody');
-                tbody.innerHTML = '';
-                tasks.forEach(task => {
-                    const tr = document.createElement('tr');
-                    tr.id = `row_${task.id}`;
-                    tr.innerHTML = `
-                        <td><input type="checkbox" id="en_${task.id}" ${task.enabled ? 'checked' : ''} onchange="syncAndRun(true)"></td>
-                        <td class="${task.type}-task">${task.name}</td>
-                        <td><input type="number" id="prio_${task.id}" value="${task.priority}" oninput="syncAndRun(true)"></td>
-                        <td><input type="number" id="period_${task.id}" value="${task.period}" oninput="syncAndRun(true)"></td>
-                        <td><input type="number" id="exec_${task.id}" value="${task.exec}" oninput="syncAndRun(true)"></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-                
-                toggleRand();
-            } catch (err) {
-                document.getElementById('errorBox').style.display = 'block';
-                document.getElementById('errorBox').innerText = "Init Hatası: " + err.message;
+    function simulate(mode) {
+        const gantt = document.getElementById('gantt');
+        const agingEnabled = document.getElementById('agingCheck').checked;
+        gantt.innerHTML = '';
+        
+        // Reset tasks for fresh simulation
+        tasks.forEach(t => { t.rem = t.dur; t.wait = 0; t.currentP = t.p; });
+        
+        let log = [];
+        let time = 0;
+        const maxTime = 40; // Limit for visualization
+
+        while (time < maxTime) {
+            let ready = tasks.filter(t => t.rem > 0);
+            if (ready.length === 0) break;
+
+            let current;
+            if (mode === 'priority') {
+                ready.sort((a, b) => b.currentP - a.currentP);
+                current = ready[0];
+            } else { // Round Robin
+                let q = 2; // Quantum
+                current = ready[time % ready.length]; // Simple RR logic
             }
-        }
 
-        function toggleRand() {
-            const isRandOn = document.getElementById('randToggle').checked;
-            document.getElementById('rerollBtn').disabled = !isRandOn; 
-            syncAndRun(true); 
-        }
-
-        function syncAndRun(forceReroll = false) {
-            try {
-                let totalUtil = 0;
-                tasks.forEach(t => {
-                    t.enabled = document.getElementById(`en_${t.id}`).checked;
-                    t.priority = parseInt(document.getElementById(`prio_${t.id}`).value) || 0;
-                    t.period = parseInt(document.getElementById(`period_${t.id}`).value) || 1;
-                    t.exec = parseInt(document.getElementById(`exec_${t.id}`).value) || 0;
-                    
-                    if (t.enabled) totalUtil += (t.exec / t.period);
-                    document.getElementById(`row_${t.id}`).className = t.enabled ? "" : "dimmed-row";
-                });
-
-                document.getElementById('utilizationInfo').innerText = `Nominal CPU Yükü: %${(totalUtil * 100).toFixed(1)}`;
-                
-                const isRR = document.getElementById('algoSelect').value === 'rr';
-                document.getElementById('quantumDiv').style.display = isRR ? 'block' : 'none';
-
-                if (forceReroll || generatedJobs.length === 0) {
-                    generateNewWorkload();
-                } else {
-                    runSimOnly();
-                }
-            } catch (err) {
-                document.getElementById('errorBox').style.display = 'block';
-                document.getElementById('errorBox').innerText = "Sync Hatası: " + err.message;
-            }
-        }
-
-        function generateNewWorkload() {
-            generatedJobs = [];
-            const isRandOn = document.getElementById('randToggle').checked;
+            // Execute 1 unit
+            log.push(current.id);
+            current.rem--;
             
-            tasks.filter(t => t.enabled).forEach(t => {
-                for(let start = 0; start < totalTime; start += t.period) {
-                    let actualExec = t.exec;
-                    
-                    if (isRandOn) {
-                        let randValue = Math.random(); 
-                        let extraTime = Math.round(t.exec * 0.1 * randValue); 
-                        actualExec = t.exec + extraTime;
-                    }
-
-                    actualExec = Math.max(1, actualExec); 
-
-                    generatedJobs.push({ 
-                        taskId: t.id, 
-                        priority: t.priority, 
-                        release: start, 
-                        deadline: start + t.period, 
-                        remaining: actualExec 
-                    });
-                }
-            });
-            runSimOnly();
-        }
-
-        function runSimOnly() {
-            try {
-                // Hata mesajı kutusunu temizle
-                document.getElementById('errorBox').style.display = 'none';
-
-                const algo = document.getElementById('algoSelect').value;
-                const quantum = parseInt(document.getElementById('quantumInput').value) || 5;
-                
-                let jobs = JSON.parse(JSON.stringify(generatedJobs));
-                
-                let blocks = [], preemptions = [], misses = [];
-                // prevJob değişkenini BURADA tanımlıyoruz ki döngü bitince de hatırlansın!
-                let activeJob = null, prevJob = null, blockStart = 0, rrQueue = [], qCount = 0;
-
-                for (let t = 0; t <= totalTime; t++) {
-                    jobs.forEach(j => { if (t === j.deadline && j.remaining > 0) misses.push({ t, id: j.taskId }); });
-                    
-                    let arrivals = jobs.filter(j => j.release === t);
-                    if (algo === 'rr') rrQueue.push(...arrivals);
-
-                    prevJob = activeJob;
-
-                    if (activeJob && activeJob.remaining <= 0) { activeJob = null; qCount = 0; }
-
-                    if (algo === 'priority') {
-                        let ready = jobs.filter(j => j.release <= t && j.remaining > 0);
-                        
-                        // --- KESİN ÇÖZÜM: PRIORITY BOOSTING (YAŞLANDIRMA) ---
-                        ready.forEach(j => {
-                            if (j.waitTime === undefined) j.waitTime = 0;
-                            if (j.isBoosted === undefined) j.isBoosted = false;
-
-                            // Eğer görev çalışmıyorsa bekleme sayacını artır
-                            if (!prevJob || j.taskId !== prevJob.taskId) {
-                                j.waitTime += 1;
-                                // 40 birim bekleyen görevi "Boost" moduna sok 
-                                if (j.waitTime > 40) {
-                                    j.isBoosted = true; // Önceliği geçici olarak en üste (999) kitlenir!
-                                }
-                            }
-                        });
-
-                        // Sıralamayı yaparken Boost (Yaşlanmış) olanları en öne al
-                        ready.sort((a, b) => {
-                            let prioA = a.isBoosted ? 999 : a.priority;
-                            let prioB = b.isBoosted ? 999 : b.priority;
-                            if (prioA === prioB) return b.priority - a.priority;
-                            return prioB - prioA;
-                        });
-                        // ----------------------------------------------------
-
-                        activeJob = ready.length > 0 ? ready[0] : null;
-                    } else {
-                        if (activeJob && qCount >= quantum) {
-                            if (rrQueue.length > 0) { rrQueue.push(activeJob); activeJob = null; }
-                            qCount = 0;
+            // Aging Logic
+            if (agingEnabled && mode === 'priority') {
+                tasks.forEach(t => {
+                    if (t.rem > 0 && t !== current) {
+                        t.wait++;
+                        if (t.wait >= 5) {
+                            t.currentP++;
+                            t.wait = 0;
                         }
-                        if (!activeJob && rrQueue.length > 0) { activeJob = rrQueue.shift(); qCount = 0; }
                     }
-
-                    if (activeJob !== prevJob) {
-                        if (t > 0) {
-                            let prevColor = prevJob ? tasks.find(x => x.id === prevJob.taskId).color : '#eee';
-                            blocks.push({ id: prevJob ? prevJob.taskId : 'idle', start: blockStart, end: t, color: prevColor });
-                            if (prevJob && prevJob.remaining > 0 && activeJob) preemptions.push({ t, from: prevJob.taskId, to: activeJob.taskId });
-                        }
-                        blockStart = t;
-                    }
-                    if (activeJob) { activeJob.remaining--; qCount++; }
-                }
-
-                // Sonda kalan bloğu kapat
-                if (blockStart < totalTime) {
-                    let finalJob = activeJob || prevJob; 
-                    let finalColor = finalJob ? tasks.find(x => x.id === finalJob.taskId).color : '#eee';
-                    blocks.push({ id: finalJob ? finalJob.taskId : 'idle', start: blockStart, end: totalTime, color: finalColor });
-                }
-
-                lastResult = { blocks, preemptions, misses };
-                redraw();
-            } catch (err) {
-                document.getElementById('errorBox').style.display = 'block';
-                document.getElementById('errorBox').innerText = "Simülasyon Hatası: " + err.message;
+                });
             }
+
+            time++;
         }
 
-        function redraw() {
-            try {
-                let zoom = parseFloat(document.getElementById('zoomLevel').value);
-                if (isNaN(zoom)) zoom = 1;
-                
-                let baseWidth = wrapper ? wrapper.clientWidth : 800;
-                if (baseWidth < 100) baseWidth = 800; 
+        renderGantt(log);
+        updateStatus(mode, agingEnabled);
+    }
 
-                canvas.width = Math.max(baseWidth, 1000) * zoom;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                const L = 180, R = 40, T = 40, B = 40;
-                const activeTasks = tasks.filter(t => t.enabled);
-                const rowH = (canvas.height - T - B) / (activeTasks.length + 1);
-                const scale = (canvas.width - L - R) / totalTime;
+    function renderGantt(log) {
+        const container = document.getElementById('gantt');
+        container.innerHTML = log.map(id => `<div class="gantt-bar ${id}">${id}</div>`).join('');
+    }
 
-                const getY = (id) => {
-                    if (id === 'idle') return T + activeTasks.length * rowH + rowH/2;
-                    let idx = activeTasks.findIndex(t => t.id === id);
-                    if(idx === -1) idx = activeTasks.length; 
-                    return T + idx * rowH + rowH/2;
-                };
+    function updateStatus(mode, aging) {
+        tasks.forEach(t => {
+            document.getElementById(`stat-${t.id}`).innerText = t.rem > 0 ? 'Starving/Waiting' : 'Finished';
+            document.getElementById(`stat-${t.id}`).style.color = t.rem > 0 ? 'red' : 'green';
+            document.getElementById(`prio-${t.id}`).innerText = t.currentP;
+        });
+        
+        let msg = mode === 'priority' ? 'Running Priority Scheduling.' : 'Running Round Robin Scheduling.';
+        if (aging) msg += ' Aging is ACTIVE.';
+        document.getElementById('statusBox').innerText = msg;
+    }
 
-                for (let t = 0; t <= totalTime; t += (zoom > 2 ? 5 : 25)) {
-                    let x = L + t * scale;
-                    ctx.beginPath(); ctx.moveTo(x, T-10); ctx.lineTo(x, canvas.height-B);
-                    ctx.strokeStyle = (t % 100 === 0) ? "#ccc" : "#f0f0f0";
-                    ctx.lineWidth = (t % 100 === 0) ? 2 : 1;
-                    ctx.stroke();
-                    if (t % 25 === 0) { ctx.fillStyle = "#999"; ctx.font = "10px Arial"; ctx.fillText(t, x-5, canvas.height-B+15); }
-                }
-
-                activeTasks.forEach((t, i) => {
-                    let y = getY(t.id);
-                    ctx.fillStyle = t.color; ctx.font = "bold 12px Arial"; ctx.textAlign = "right";
-                    let isRR = document.getElementById('algoSelect').value === 'rr';
-                    ctx.fillText(isRR ? t.name : `${t.name} (P:${t.priority})`, L-10, y+5);
-                    ctx.beginPath(); ctx.moveTo(L, T+(i+1)*rowH); ctx.lineTo(canvas.width-R, T+(i+1)*rowH); ctx.strokeStyle = "#eee"; ctx.stroke();
-                });
-                ctx.fillStyle = "#999"; ctx.fillText("IDLE", L-10, getY('idle')+5);
-
-                lastResult.blocks.forEach(b => {
-                    if (b.start === b.end) return;
-                    ctx.fillStyle = b.color;
-                    let x = L + b.start * scale;
-                    let y = getY(b.id) - rowH*0.3;
-                    let w = Math.max(1, (b.end - b.start) * scale);
-                    let h = rowH*0.6;
-                    ctx.fillRect(x, y, w, h);
-                    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.strokeRect(x, y, w, h);
-                });
-
-                lastResult.preemptions.forEach(p => {
-                    let x = L + p.t * scale, y1 = getY(p.from), y2 = getY(p.to);
-                    ctx.strokeStyle = "red"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.stroke();
-                    ctx.fillStyle = "red"; ctx.beginPath(); const dir = y2 > y1 ? 1 : -1;
-                    ctx.moveTo(x, y2 - (5 * dir)); ctx.lineTo(x - 5, y2 - (12 * dir)); ctx.lineTo(x + 5, y2 - (12 * dir)); ctx.fill();
-                });
-
-                lastResult.misses.forEach(m => {
-                    let x = L + m.t * scale, y = getY(m.id);
-                    ctx.fillStyle = "red"; ctx.font = "bold 14px Arial"; ctx.fillText("✘", x+5, y+5);
-                });
-            } catch(err) {
-                document.getElementById('errorBox').style.display = 'block';
-                document.getElementById('errorBox').innerText = "Çizim Hatası: " + err.message;
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', init);
-    </script>
+    initTasks();
+</script>
 </body>
 </html>
