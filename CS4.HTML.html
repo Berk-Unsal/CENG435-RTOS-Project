@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Case Study 4: Deadlock Lab</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .mutex-container { display: flex; gap: 20px; margin: 20px 0; }
+        .mutex { flex: 1; padding: 15px; border: 2px solid #34495e; border-radius: 8px; text-align: center; font-weight: bold; background: #ecf0f1; }
+        .locked { background: #e74c3c; color: white; border-color: #c0392b; }
+        .gantt { height: 50px; background: #222; display: flex; gap: 2px; padding: 10px; border-radius: 8px; margin-top: 20px; overflow-x: auto; }
+        .bar { min-width: 50px; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border-radius: 3px; font-size: 12px; }
+        .A { background: #3498db; } .B { background: #9b59b6; } .DL { background: #000; } .FIX { background: #27ae60; }
+        .log { margin-top: 15px; padding: 12px; background: #f9f9f9; border-left: 5px solid #3498db; font-family: monospace; }
+        button { padding: 10px 15px; cursor: pointer; border: none; border-radius: 5px; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Case Study 4: Deadlock & Mutex Timeout</h2>
+    
+    <div class="mutex-container">
+        <div id="m_sensor" class="mutex">M_Sensor: FREE</div>
+        <div id="m_disk" class="mutex">M_Disk: FREE</div>
+    </div>
+
+    <div class="log" id="statusLog">System Idle. Press a button to simulate.</div>
+
+    <div style="margin-top: 20px; display: flex; gap: 10px;">
+        <button onclick="runScenario('deadlock')" style="background: #e74c3c;">4.b Trigger Deadlock</button>
+        <button onclick="runScenario('timeout')" style="background: #27ae60;">4.c Apply Mutex Timeout</button>
+        <button onclick="location.reload()" style="background: #95a5a6;">Reset</button>
+    </div>
+
+    <div class="gantt" id="ganttChart"></div>
+</div>
+
+<script>
+    const log = document.getElementById('statusLog');
+    const chart = document.getElementById('ganttChart');
+    const m_sensor = document.getElementById('m_sensor');
+    const m_disk = document.getElementById('m_disk');
+
+    function updateMutex(name, status, owner) {
+        const el = name === 'sensor' ? m_sensor : m_disk;
+        const label = name === 'sensor' ? 'M_Sensor' : 'M_Disk';
+        if (status === 'LOCKED') {
+            el.innerText = `${label}: LOCKED by ${owner}`;
+            el.className = 'mutex locked';
+        } else {
+            el.innerText = `${label}: FREE`;
+            el.className = 'mutex';
+        }
+    }
+
+    function runScenario(type) {
+        chart.innerHTML = '';
+        updateMutex('sensor', 'FREE'); updateMutex('disk', 'FREE');
+        let step = 0;
+
+        const interval = setInterval(() => {
+            if (step === 0) {
+                updateMutex('sensor', 'LOCKED', 'Task A');
+                chart.innerHTML += '<div class="bar A">A:Lock(S)</div>';
+                log.innerText = "T0: Task A locks M_Sensor.";
+            } 
+            else if (step === 1) {
+                updateMutex('disk', 'LOCKED', 'Task B');
+                chart.innerHTML += '<div class="bar B">B:Lock(D)</div>';
+                log.innerText = "T1: Task B interrupts and locks M_Disk.";
+            }
+            else if (step === 2) {
+                chart.innerHTML += '<div class="bar A" style="opacity:0.5">A:Wait(D)</div>';
+                log.innerText = "T2: Task A requests M_Disk (Blocked by B).";
+            }
+            else if (step === 3) {
+                if (type === 'deadlock') {
+                    chart.innerHTML += '<div class="bar DL">DEADLOCK</div>';
+                    log.innerHTML = "<span style='color:red'>T3: CRITICAL DEADLOCK - Task B requests M_Sensor (Blocked by A). Circular Wait!</span>";
+                    clearInterval(interval);
+                } else {
+                    // 4.c SOLUTION: Mutex Timeout
+                    chart.innerHTML += '<div class="bar FIX">B:Timeout</div>';
+                    log.innerText = "T3: Task B requests M_Sensor. Fails to acquire after 100ms. Giving up M_Disk...";
+                    updateMutex('disk', 'FREE'); // Task B releases its hold due to timeout
+                }
+            }
+            else if (step === 4 && type === 'timeout') {
+                updateMutex('disk', 'LOCKED', 'Task A');
+                chart.innerHTML += '<div class="bar A">A:Lock(D)</div>';
+                log.innerText = "T4: Task A finally acquires M_Disk and continues.";
+            }
+
+            step++;
+            if (step > 6) clearInterval(interval);
+        }, 1200);
+    }
+</script>
+</body>
+</html>
